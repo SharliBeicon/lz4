@@ -29,6 +29,7 @@
 # lz4c32: Same as lz4c, but forced to compile in 32-bits mode
 # ##########################################################################
 SED ?= sed
+CARGO ?= cargo
 
 # Version numbers
 LIBLZ4DIR   := ../lib
@@ -45,6 +46,11 @@ LIBVER   := $(shell echo $(LIBVER_SCRIPT))
 LIBFILES  = $(wildcard $(LIBLZ4DIR)/*.c)
 SRCFILES  = $(sort $(LIBFILES) $(wildcard *.c))
 OBJFILES  = $(SRCFILES:.c=.o)
+
+RUSTDIR ?= ../lz4-rs
+RUST_PROFILE ?= release
+RUST_TARGET_DIR := $(RUSTDIR)/target/$(RUST_PROFILE)
+RUST_STATICLIB := $(RUST_TARGET_DIR)/liblz4_rs.a
 
 DEBUGFLAGS= -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
             -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
@@ -83,6 +89,9 @@ else
   THREAD_MSG := $(NO_THREAD_MSG)
 endif
 
+$(RUST_STATICLIB): $(RUSTDIR)/src/lib.rs $(RUSTDIR)/Cargo.toml
+	$(CARGO) build --manifest-path $(RUSTDIR)/Cargo.toml --lib --profile $(RUST_PROFILE)
+
 LZ4_VERSION=$(LIBVER)
 MD2ROFF    = ronn
 MD2ROFF_FLAGS = --roff --warnings --manual="User Commands" --organization="lz4 $(LZ4_VERSION)"
@@ -114,12 +123,16 @@ lz4-exe.o: lz4-exe.rc
 
 lz4: CPPFLAGS += $(THREAD_CPP)
 lz4: LDFLAGS += $(THREAD_LD)
+lz4: $(RUST_STATICLIB)
+lz4: LDLIBS += $(RUST_STATICLIB)
 $(eval $(call c_program,lz4,$(LZ4_OBJS),lz4-exe.o,echo "$(THREAD_MSG)"))
 
 else # not WINBASED
 
 lz4: CPPFLAGS += $(THREAD_CPP)
 lz4: LDFLAGS += $(THREAD_LD)
+lz4: $(RUST_STATICLIB)
+lz4: LDLIBS += $(RUST_STATICLIB)
 $(eval $(call c_program,lz4,$(LZ4_OBJS),,echo "$(THREAD_MSG)"))
 endif
 
@@ -129,6 +142,8 @@ lz4-release: CPPFLAGS+=-DNDEBUG
 lz4-release: lz4
 
 lz4-nomt:
+lz4-nomt: $(RUST_STATICLIB)
+lz4-nomt: LDLIBS += $(RUST_STATICLIB)
 $(eval $(call c_program,lz4-nomt,$(LZ4_OBJS)))
 
 CLEAN += lz4-wlib
@@ -150,6 +165,8 @@ lz4c: lz4
 	$(LN_SF) lz4$(EXT) lz4c$(EXT)
 
 lz4c32: CFLAGS += -m32
+lz4c32: $(RUST_STATICLIB)
+lz4c32: LDLIBS += $(RUST_STATICLIB)
 $(eval $(call c_program,lz4c32,$(LZ4_OBJS)))
 
 CLEAN += unlz4

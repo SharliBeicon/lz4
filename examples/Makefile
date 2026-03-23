@@ -28,11 +28,18 @@
 # ##########################################################################
 
 LIBDIR    := ../lib
+CARGO ?= cargo
+
+RUSTDIR ?= ../lz4-rs
+RUST_PROFILE ?= release
+RUST_TARGET_DIR := $(RUSTDIR)/target/$(RUST_PROFILE)
+RUST_STATICLIB := $(RUST_TARGET_DIR)/liblz4_rs.a
 
 CPPFLAGS  += -I$(LIBDIR)
 USERCFLAGS:= $(CFLAGS)
 WFLAGS     = -std=gnu99 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Wstrict-prototypes -Wc++-compat
 CFLAGS     = $(WFLAGS) -O2 $(USERCFLAGS)
+LDLIBS    += $(RUST_STATICLIB)
 
 TESTFILE   = Makefile
 TESTFILE_SMALL= .gitignore
@@ -47,6 +54,9 @@ default: all
 
 C_SRCDIRS = . ../lib
 include ../build/make/multiconf.make
+
+$(RUST_STATICLIB): $(RUSTDIR)/src/lib.rs $(RUSTDIR)/Cargo.toml
+	$(CARGO) build --manifest-path $(RUSTDIR)/Cargo.toml --lib --profile $(RUST_PROFILE)
 
 $(SLIBLZ4):
 $(eval $(call static_library,$(SLIBLZ4), $(LIBLZ4OBJS)))
@@ -65,7 +75,7 @@ ALL = print_version \
 .PHONY: all
 all: $(ALL)
 
-$(ALL): $(SLIBLZ4)
+$(ALL): $(SLIBLZ4) $(RUST_STATICLIB)
 
 .PHONY:$(LZ4)
 $(LZ4): MAKEFLAGS=

@@ -32,6 +32,12 @@ LIBDIR  := ../lib
 PRGDIR  := ../programs
 VERSIONSTESTDIR := versionsTest
 PYTHON  ?= python3
+CARGO ?= cargo
+
+RUSTDIR ?= ../lz4-rs
+RUST_PROFILE ?= release
+RUST_TARGET_DIR := $(RUSTDIR)/target/$(RUST_PROFILE)
+RUST_STATICLIB := $(RUST_TARGET_DIR)/liblz4_rs.a
 
 DEBUGLEVEL?= 1
 DEBUGFLAGS = -g -DLZ4_DEBUG=$(DEBUGLEVEL)
@@ -49,6 +55,11 @@ LZ4 := $(PRGDIR)/lz4$(EXT)
 
 C_SRCDIRS = $(LIBDIR) $(PRGDIR) .
 include ../build/make/multiconf.make
+
+$(RUST_STATICLIB): $(RUSTDIR)/src/lib.rs $(RUSTDIR)/Cargo.toml
+	$(CARGO) build --manifest-path $(RUSTDIR)/Cargo.toml --lib --profile $(RUST_PROFILE)
+
+LDLIBS += $(RUST_STATICLIB)
 
 # Default test parameters
 TEST_FILES   := COPYING
@@ -89,7 +100,7 @@ lz4c32:  # create a 32-bits version for 32/64 interop tests
 
 fullbench : DEBUGLEVEL=0
 fullbench : CPPFLAGS += -DNDEBUG
-$(eval $(call c_program,fullbench,fullbench.o lz4.o lz4hc.o lz4frame.o xxhash.o))
+$(eval $(call c_program,fullbench,fullbench.o lz4.o lz4hc.o lz4frame.o xxhash.o,$(RUST_STATICLIB)))
 
 .PHONY: $(LIBDIR)/liblz4.a
 $(LIBDIR)/liblz4.a: MAKEFLAGS=
@@ -99,8 +110,8 @@ $(LIBDIR)/liblz4.a:
 CLEAN += fullbench-lib
 fullbench-lib : DEBUGLEVEL=0
 fullbench-lib : CPPFLAGS += -DNDEBUG
-fullbench-lib: fullbench.c $(LIBDIR)/liblz4.a
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
+fullbench-lib: fullbench.c $(LIBDIR)/liblz4.a $(RUST_STATICLIB)
+	$(CC) $(ALLFLAGS) $^ -o $@$(EXT) $(LDLIBS)
 
 # Note: Windows only
 ifeq ($(WINBASED),yes)
@@ -119,25 +130,25 @@ fullbench-wmalloc: CPPFLAGS += -DLZ4_USER_MEMORY_FUNCTIONS
 fullbench-wmalloc: fullbench
 
 fuzzer:
-$(eval $(call c_program_shared_o,fuzzer,lz4.o lz4hc.o xxhash.o fuzzer.o))
+$(eval $(call c_program_shared_o,fuzzer,lz4.o lz4hc.o xxhash.o fuzzer.o,$(RUST_STATICLIB)))
 
 frametest:
-$(eval $(call c_program_shared_o,frametest,lz4frame.o lz4file.o lz4.o lz4hc.o xxhash.o frametest.o))
+$(eval $(call c_program_shared_o,frametest,lz4frame.o lz4file.o lz4.o lz4hc.o xxhash.o frametest.o,$(RUST_STATICLIB)))
 
 roundTripTest:
-$(eval $(call c_program_shared_o,roundTripTest,lz4.o lz4hc.o xxhash.o roundTripTest.o))
+$(eval $(call c_program_shared_o,roundTripTest,lz4.o lz4hc.o xxhash.o roundTripTest.o,$(RUST_STATICLIB)))
 
 datagen: CPPFLAGS+=-DNDEBUG
-$(eval $(call c_program,datagen,datagen.o lorem.o loremOut.o datagencli.o))
+$(eval $(call c_program,datagen,datagen.o lorem.o loremOut.o datagencli.o,$(RUST_STATICLIB)))
 
 checkFrame:
-$(eval $(call c_program_shared_o,checkFrame,lz4.o lz4hc.o xxhash.o lz4frame.o checkFrame.o))
+$(eval $(call c_program_shared_o,checkFrame,lz4.o lz4hc.o xxhash.o lz4frame.o checkFrame.o,$(RUST_STATICLIB)))
 
 decompress-partial:
-$(eval $(call c_program_shared_o,decompress-partial,lz4.o decompress-partial.o))
+$(eval $(call c_program_shared_o,decompress-partial,lz4.o decompress-partial.o,$(RUST_STATICLIB)))
 
 decompress-partial-usingDict:
-$(eval $(call c_program_shared_o,decompress-partial-usingDict,lz4.o decompress-partial-usingDict.o))
+$(eval $(call c_program_shared_o,decompress-partial-usingDict,lz4.o decompress-partial-usingDict.o,$(RUST_STATICLIB)))
 
 .PHONY: clean
 clean: clean_cache
@@ -164,7 +175,7 @@ abiTests:
 	$(PYTHON) test-lz4-abi.py
 
 checkTag:
-$(eval $(call c_program_shared_o,checkTag,checkTag.o))
+$(eval $(call c_program_shared_o,checkTag,checkTag.o,$(RUST_STATICLIB)))
 
 
 #-----------------------------------------------------------------------------

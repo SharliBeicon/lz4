@@ -32,6 +32,7 @@
 #  - LZ4 forum froup : https://groups.google.com/forum/#!forum/lz4c
 # ################################################################
 SED ?= sed
+CARGO ?= cargo
 
 # Version numbers
 LIBVER_MAJOR_SCRIPT:=`$(SED) -n '/define[[:blank:]][[:blank:]]*LZ4_VERSION_MAJOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < ./lz4.h`
@@ -45,6 +46,11 @@ LIBVER  := $(shell echo $(LIBVER_SCRIPT))
 
 BUILD_SHARED:=yes
 BUILD_STATIC:=yes
+
+RUSTDIR ?= ../lz4-rs
+RUST_PROFILE ?= release
+RUST_TARGET_DIR := $(RUSTDIR)/target/$(RUST_PROFILE)
+RUST_STATICLIB := $(RUST_TARGET_DIR)/liblz4_rs.a
 
 CPPFLAGS+= -DXXH_NAMESPACE=LZ4_
 USERCFLAGS:= -O3 $(CFLAGS)
@@ -88,6 +94,9 @@ ifeq ($(TARGET_OS), AIX)
 	SONAME_FLAGS =
 endif
 endif
+
+$(RUST_STATICLIB): $(RUSTDIR)/src/lib.rs $(RUSTDIR)/Cargo.toml
+	$(CARGO) build --manifest-path $(RUSTDIR)/Cargo.toml --lib --profile $(RUST_PROFILE)
 
 # silent mode by default; verbose can be triggered by V=1 or VERBOSE=1
 $(V)$(VERBOSE).SILENT:
@@ -135,8 +144,10 @@ $(LIBLZ4): $(SRCFILES) liblz4-dll.o
 else   # not windows
 
 $(LIBLZ4): LDFLAGS += -fvisibility=hidden $(SONAME_FLAGS)
+$(LIBLZ4): $(RUST_STATICLIB)
+$(LIBLZ4): LDLIBS += $(RUST_STATICLIB)
 ifeq ($(BUILD_SHARED),yes)
-$(eval $(call c_dynamic_library,$(LIBLZ4),$(OBJFILES),,echo "$(LIBLZ4) created"))
+$(eval $(call c_dynamic_library,$(LIBLZ4),$(OBJFILES),,echo "$(LIBLZ4) created",$(RUST_STATICLIB)))
 endif
 
 endif

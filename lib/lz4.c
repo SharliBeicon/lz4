@@ -742,9 +742,11 @@ typedef enum { noDictIssue = 0, dictSmall } dictIssue_directive;
 /*-************************************
 *  Local Utils
 **************************************/
+extern int LZ4_rs_compressBound(int isize);
+
 int LZ4_versionNumber (void) { return LZ4_VERSION_NUMBER; }
 const char* LZ4_versionString(void) { return LZ4_VERSION_STRING; }
-int LZ4_compressBound(int isize)  { return LZ4_COMPRESSBOUND(isize); }
+int LZ4_compressBound(int isize)  { return LZ4_rs_compressBound(isize); }
 int LZ4_sizeofState(void) { return sizeof(LZ4_stream_t); }
 
 
